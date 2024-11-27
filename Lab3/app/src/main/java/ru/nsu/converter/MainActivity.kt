@@ -52,14 +52,14 @@ class MainActivity : Activity() {
         override fun onServiceConnected(name: ComponentName?, service: IBinder?) {
             serviceMessenger = Messenger(service)
             isBound = true
-            Log.d("MainActivity", "Service подключен")
+            Log.d("MainActivity", "Сервис подключен")
             requestCurrencies()
         }
 
         override fun onServiceDisconnected(name: ComponentName?) {
             serviceMessenger = null
             isBound = false
-            Log.d("MainActivity", "Service отключен")
+            Log.d("MainActivity", "Сервис отключен")
         }
     }
 
@@ -98,9 +98,9 @@ class MainActivity : Activity() {
         }
 
         if (bindService(Intent(this, CurrencyService::class.java), connection, Context.BIND_AUTO_CREATE)) {
-            Log.println(Log.DEBUG,"MainActivity", "Bind service")
+            Log.println(Log.DEBUG,"MainActivity", "Сервис прсоединён")
         } else {
-            Log.println(Log.DEBUG,"MainActivity", "Cannot bind service")
+            Log.println(Log.DEBUG,"MainActivity", "Не удалось присоединить сервис")
         }
 
     }

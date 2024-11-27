@@ -31,13 +31,12 @@ class CurrencyService : Service() {
     private val messenger = Messenger(IncomingHandler())
 
     override fun onBind(intent: Intent?): IBinder {
-        Log.d("CurrencyService", "onBind called")
         return messenger.binder
     }
 
     inner class IncomingHandler : Handler(Looper.getMainLooper()) {
         override fun handleMessage(msg: Message) {
-            Log.d("CurrencyService", "Received message: ${msg.what}")
+            Log.d("CurrencyService", "Полученное сообщение: ${msg.what}")
             when (msg.what) {
                 ACTION_GET_CURRENCIES -> fetchCurrencies(msg.replyTo)
                 ACTION_CONVERT_CURRENCY -> {
@@ -55,24 +54,24 @@ class CurrencyService : Service() {
 
 
     private fun fetchCurrencies(replyTo: Messenger) {
-        Log.d("CurrencyService", "Fetching currencies...")
+        Log.d("CurrencyService", "Запрос валют...")
         api.getCurrencies().enqueue(object : Callback<SymbolsResponse> {
             override fun onResponse(call: Call<SymbolsResponse>, response: Response<SymbolsResponse>) {
                 if (response.isSuccessful) {
                     val result = response.body()?.symbols?.keys?.toList() ?: emptyList()
 
-                    Log.d("CurrencyService", "Currencies fetched successfully: $result")
+                    Log.d("CurrencyService", "Валюты получены  успешно: $result")
                     val reply = Message.obtain(null, ACTION_GET_CURRENCIES)
 
                     reply.data = Bundle().apply { putStringArrayList(RESULT_CURRENCIES, ArrayList(result)) }
                     replyTo.send(reply)
                 } else {
-                    Log.e("CurrencyService", "Error fetching currencies: ${response.errorBody()?.string()}")
+                    Log.e("CurrencyService", "Ошибка получения валют: ${response.errorBody()?.string()}")
                 }
             }
 
             override fun onFailure(call: Call<SymbolsResponse>, t: Throwable) {
-                Log.e("CurrencyService", "Failed to fetch currencies", t)
+                Log.e("CurrencyService", "Ошибка получения валют:", t)
             }
         })
     }
@@ -84,18 +83,18 @@ class CurrencyService : Service() {
             override fun onResponse(call: Call<ConversionResponse>, response: Response<ConversionResponse>) {
                 if (response.isSuccessful) {
                     val result = response.body()?.result ?: 0.0
-                    Log.d("CurrencyService", "Conversion successful: $result")
+                    Log.d("CurrencyService", "Конветрация прошла успешно: $result")
                     val reply = Message.obtain(null, ACTION_CONVERT_CURRENCY)
 
                     reply.data = Bundle().apply { putDouble(RESULT_CONVERSION, result) }
                     replyTo.send(reply)
                 } else {
-                    Log.e("CurrencyService", "Error converting currency: ${response.errorBody()}")
+                    Log.e("CurrencyService", "Ошибка конветрации: ${response.errorBody()}")
                 }
             }
 
             override fun onFailure(call: Call<ConversionResponse>, t: Throwable) {
-                Log.e("CurrencyService", "Failed to convert currency", t)
+                Log.e("CurrencyService", "Ошибка конветрации", t)
             }
         })
     }
