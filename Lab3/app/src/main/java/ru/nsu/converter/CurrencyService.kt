@@ -36,7 +36,6 @@ class CurrencyService : Service() {
 
     inner class IncomingHandler : Handler(Looper.getMainLooper()) {
         override fun handleMessage(msg: Message) {
-            Log.d("CurrencyService", "Полученное сообщение: ${msg.what}")
             when (msg.what) {
                 ACTION_GET_CURRENCIES -> fetchCurrencies(msg.replyTo)
                 ACTION_CONVERT_CURRENCY -> {
@@ -52,50 +51,57 @@ class CurrencyService : Service() {
         }
     }
 
-
     private fun fetchCurrencies(replyTo: Messenger) {
-        Log.d("CurrencyService", "Запрос валют...")
-        api.getCurrencies().enqueue(object : Callback<SymbolsResponse> {
-            override fun onResponse(call: Call<SymbolsResponse>, response: Response<SymbolsResponse>) {
-                if (response.isSuccessful) {
-                    val result = response.body()?.symbols?.keys?.toList() ?: emptyList()
-
-                    Log.d("CurrencyService", "Валюты получены  успешно: $result")
-                    val reply = Message.obtain(null, ACTION_GET_CURRENCIES)
-
-                    reply.data = Bundle().apply { putStringArrayList(RESULT_CURRENCIES, ArrayList(result)) }
-                    replyTo.send(reply)
-                } else {
-                    Log.e("CurrencyService", "Ошибка получения валют: ${response.errorBody()?.string()}")
+        api.getCurrencies().enqueue(createCallback(
+            onSuccess = { symbols ->
+                sendMessage(replyTo, ACTION_GET_CURRENCIES) {
+                    putStringArrayList(RESULT_CURRENCIES, ArrayList(symbols.symbols.keys))
                 }
+            },
+            onError = { error ->
+                Log.e("CurrencyService", "Ошибка получения валют: $error")
             }
-
-            override fun onFailure(call: Call<SymbolsResponse>, t: Throwable) {
-                Log.e("CurrencyService", "Ошибка получения валют:", t)
-            }
-        })
+        ))
     }
 
     private fun fetchConversion(from: String, to: String, amount: Double, replyTo: Messenger) {
-        Log.d("CurrencyService", "Converting $amount $from to $to...")
-
-        api.convertCurrency(from, to, amount).enqueue(object : Callback<ConversionResponse> {
-            override fun onResponse(call: Call<ConversionResponse>, response: Response<ConversionResponse>) {
-                if (response.isSuccessful) {
-                    val result = response.body()?.result ?: 0.0
-                    Log.d("CurrencyService", "Конветрация прошла успешно: $result")
-                    val reply = Message.obtain(null, ACTION_CONVERT_CURRENCY)
-
-                    reply.data = Bundle().apply { putDouble(RESULT_CONVERSION, result) }
-                    replyTo.send(reply)
-                } else {
-                    Log.e("CurrencyService", "Ошибка конветрации: ${response.errorBody()}")
+        api.convertCurrency(from, to, amount).enqueue(createCallback(
+            onSuccess = { conversion ->
+                sendMessage(replyTo, ACTION_CONVERT_CURRENCY) {
+                    putDouble(RESULT_CONVERSION, conversion.result ?: 0.0)
                 }
+            },
+            onError = { error ->
+                Log.e("CurrencyService", "Ошибка конвертации: $error")
             }
+        ))
+    }
 
-            override fun onFailure(call: Call<ConversionResponse>, t: Throwable) {
-                Log.e("CurrencyService", "Ошибка конветрации", t)
+    private fun <T> createCallback(
+        onSuccess: (response: T) -> Unit,
+        onError: (Throwable) -> Unit
+    ): Callback<T> = object : Callback<T> {
+        override fun onResponse(call: Call<T>, response: Response<T>) {
+            if (response.isSuccessful) {
+                response.body()?.let { onSuccess(it) }
+            } else {
+                Log.e("CurrencyService", "Ошибка ответа: ${response.errorBody()?.string()}")
             }
-        })
+        }
+
+        override fun onFailure(call: Call<T>, t: Throwable) {
+            onError(t)
+        }
+    }
+
+    private fun sendMessage(replyTo: Messenger, action: Int, configureBundle: Bundle.() -> Unit) {
+        val msg = Message.obtain(null, action)
+        msg.data = Bundle().apply(configureBundle)
+
+        try {
+            replyTo.send(msg)
+        } catch (e: RemoteException) {
+            Log.e("CurrencyService", "Ошибка отправки сообщения", e)
+        }
     }
 }
